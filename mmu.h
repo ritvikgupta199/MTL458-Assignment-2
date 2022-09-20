@@ -1,8 +1,8 @@
-#define RAM_SIZE 200 * 1024 * 1024 // 200 MB
+#define RAM_SIZE (200 * 1024 * 1024) // 200 MB
 
-#define OS_MEM_SIZE 72 * 1024 * 1024 // 72 MB
+#define OS_MEM_SIZE (72 * 1024 * 1024) // 72 MB
 
-#define PAGE_SIZE 4 * 1024 // 4 KB
+#define PAGE_SIZE (4 * 1024) // 4 KB
 
 
 // interpret each page table entry as unsigned int
@@ -11,7 +11,7 @@ typedef unsigned int page_table_entry;
 #define PAGE_TABLE_ENTRY_SIZE sizeof(page_table_entry); 
 
 
-#define PS_VIRTUAL_MEM_SIZE 4 * 1024 * 1024  // Each process has 4 MB of virtual memory
+#define PS_VIRTUAL_MEM_SIZE (4 * 1024 * 1024)  // Each process has 4 MB of virtual memory
 
 #define MAX_PROCS 100  // Assume that the maximum number of processes that can exist at a time is 100
                        // Total processes created may be more than 100(as some of them will exit).
@@ -42,6 +42,8 @@ enum ERROR {
 
 // See mmu.c file for description of functions
 
+void os_init();
+
 int create_ps(int code_size, int ro_data_size, int rw_data_size,
                  int max_stack_size, unsigned char* code_and_ro_data);
 
@@ -51,7 +53,7 @@ int fork_ps(int pid);
 
 void allocate_pages(int pid, int vmem_addr, int num_pages, int flags);
 
-void deallocate_pages(int pid, int vmem_addr);
+void deallocate_pages(int pid, int vmem_addr, int num_pages);
 
 unsigned char read_mem(int pid, int vmem_addr);
 
