@@ -21,8 +21,9 @@ typedef unsigned int page_table_entry;
 // Block for storing information of each process
 struct PCB {
     int pid;
+    int num_pages;
+    int code_start_add, ro_data_start_add, rw_data_start_add, heap_start_add, stack_start_add;
     page_table_entry* page_table;
-    // TODO student: can add more fields
 };
 
 
@@ -33,6 +34,9 @@ enum PAGE_PROTECTIONS {
     O_EX    = 4     // execute allowed
 };
 
+enum PAGE_STATUS {
+    PG_PRESENT = 8,    // page is present in physical memory
+};
 
 enum ERROR {
     ERR_SEG_FAULT
@@ -44,6 +48,10 @@ enum ERROR {
 // See mmu.c file for description of functions
 
 void os_init();
+
+struct PCB* find_process(int pid);
+
+int find_free_page();
 
 int create_ps(int code_size, int ro_data_size, int rw_data_size,
                  int max_stack_size, unsigned char* code_and_ro_data);
@@ -62,7 +70,7 @@ void write_mem(int pid, int vmem_addr, unsigned char byte);
 
 
 
-int page_num_to_frame_num(page_table_entry pte);
+int pte_to_frame_num(page_table_entry pte);
 
 int is_readable(page_table_entry pte);
 
