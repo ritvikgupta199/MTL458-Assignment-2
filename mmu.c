@@ -118,10 +118,25 @@ void os_init() {
 }
 
 void print_procs(int pid){
-    struct PCB* pcb = find_process(0);
+    struct PCB* pcb = find_process(pid);
     printf("START\n");
     printf("%d\n", pcb->pid);
     for (int i=0; i< 10; i++){
+        unsigned int number = pcb->page_table[i];
+        for (int i = 0; i < 32; ++i) {
+            if (number >> i & 0x1) putchar('1');
+            else putchar('0');
+        }
+        printf(" Frame:%d R:%d, W:%d, X:%d, P:%d",
+                pte_to_frame_num(number),
+                is_readable(number),
+                is_writeable(number),
+                is_executable(number),
+                is_present(number)
+                );
+        putchar('\n');
+    }
+    for (int i=PS_VM_PAGES-1; i > PS_VM_PAGES-10; i--){
         unsigned int number = pcb->page_table[i];
         for (int i = 0; i < 32; ++i) {
             if (number >> i & 0x1) putchar('1');
@@ -147,7 +162,15 @@ unsigned char code_ro_data[10 * MB];
 int main(){
     os_init();
     int pid = create_ps(PAGE_SIZE*3, PAGE_SIZE*2, PAGE_SIZE*2, PAGE_SIZE*6, code_ro_data);
-    print_procs(0);
+    print_procs(pid);
+    allocate_pages(pid, PAGE_SIZE*7, 2, O_READ | O_WRITE);
+    print_procs(pid);
+
+    code_ro_data[0] = 19;
+    write_mem(pid, PAGE_SIZE*7, code_ro_data[0]);
+    unsigned char c = read_mem(pid, PAGE_SIZE*7);
+    printf("%d \n", c);
+
     return 0;
 }
 
