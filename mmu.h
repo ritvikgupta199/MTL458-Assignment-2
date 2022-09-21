@@ -8,7 +8,8 @@
 // interpret each page table entry as unsigned int
 // 32 bits should be enough to store all the info
 typedef unsigned int page_table_entry;
-#define PAGE_TABLE_ENTRY_SIZE sizeof(page_table_entry); 
+#define PAGE_TABLE_ENTRY_SIZE sizeof(page_table_entry) 
+#define FREE_BIT_SIZE sizeof(char)
 
 
 #define PS_VIRTUAL_MEM_SIZE (4 * 1024 * 1024)  // Each process has 4 MB of virtual memory

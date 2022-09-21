@@ -16,25 +16,76 @@ unsigned char* OS_MEM = RAM;
 // 128 MB size (RAM_SIZE - OS_MEM_SIZE)
 unsigned char* PS_MEM = RAM + OS_MEM_SIZE; 
 
-
 // This first frame has frame number 0 and is located at start of RAM(NOT PS_MEM).
 // We also include the OS_MEM even though it is not paged. This is 
 // because the RAM can only be accessed through physical RAM addresses.  
 // The OS should ensure that it does not map any of the frames, that correspond
 // to its memory, to any process's page. 
-int NUM_FRAMES = ((RAM_SIZE) / PAGE_SIZE);
+int NUM_FRAMES = ((RAM_SIZE) / PAGE_SIZE); // 50 KB
 
 // Actual number of usable frames by the processes.
-int NUM_USABLE_FRAMES = ((RAM_SIZE - OS_MEM_SIZE) / PAGE_SIZE);
+int NUM_USABLE_FRAMES = ((RAM_SIZE - OS_MEM_SIZE) / PAGE_SIZE); // 32 KB
+
+const int PCB_SIZE = sizeof(struct PCB);
+const int PAGE_TABLE_SIZE = ((RAM_SIZE - OS_MEM_SIZE) / PAGE_SIZE) * PAGE_TABLE_ENTRY_SIZE;
+const int PCB_PAGE_SIZE = PCB_SIZE + PAGE_TABLE_SIZE;
+const int PCB_START = ((RAM_SIZE - OS_MEM_SIZE) / PAGE_SIZE) * FREE_BIT_SIZE + 1024; // address 33 KB
+const int PROC_COUNTER = PCB_START + PCB_PAGE_SIZE * MAX_PROCS + 1024;
+
+/**
+ *  OS Memory Layout: 
+ *  --------------------------------------- (os memory start)
+ *           free list for frames 
+ *     (1 B * NUM_USABLE_FRAMES) = 32 KB
+ *  ---------------------------------------  
+ *           1 KB free margin space
+ *  ---------------------------------------
+ *         PCBs for MAX_PROCS processes
+ *       (PCB_PAGE_SIZE * MAX_PROCS) = 1 MB)
+ *       ----------------------------
+ *              PCB for process
+ *                  (16 B)
+ *       ----------------------------
+ *          Page table for process
+ *     (NUM_USBLE_FRAMES * 4B) = 128 KB
+ *       ----------------------------
+ *  ---------------------------------------
+ *           Process Counter (int)
+ *  --------------------------------------- (os memory end)
+ */
+
+
 
 // To be set in case of errors. 
-int error_no; 
-
+int error_no;
 
 
 void os_init() {
-    // TODO student 
-    // initialize your data structures.
+    char* free_list = (char*) (&OS_MEM[0]); // Using char as it has same size as bool
+    for (int i = 0; i < NUM_USABLE_FRAMES; i++) {
+        free_list[i] = '1';
+    }
+    for (int i = 0; i < MAX_PROCS; i++) {
+        int start_add = PCB_START + (i * PCB_PAGE_SIZE);
+        struct PCB* pcb = (struct PCB*) (&OS_MEM[start_add]);
+        pcb->pid = -1;
+        pcb->page_table = (page_table_entry*) (&OS_MEM[start_add + PCB_SIZE]);
+    }
+    int* proc_counter = (int*) (&OS_MEM[PROC_COUNTER]);
+    *proc_counter = 0;
+}
+
+void read(){
+    struct PCB* pcb = (struct PCB*) (&OS_MEM[PCB_START]);
+    printf("%d\n", pcb->pid);
+    int* proc = (int*) (&OS_MEM[PROC_COUNTER]);
+    printf("%d\n", *proc);
+}
+
+int main(){
+    os_init();
+    read();
+    return 0;
 }
 
 
