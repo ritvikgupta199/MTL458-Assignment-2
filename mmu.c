@@ -139,9 +139,14 @@ void print_procs(int pid){
     
 }
 
+#define MB (1024 * 1024)
+#define KB 1024
+unsigned char code_ro_data[10 * MB];
+
+
 int main(){
     os_init();
-    int pid = create_ps(PAGE_SIZE*3, PAGE_SIZE*2, PAGE_SIZE*2, PAGE_SIZE*6, NULL);
+    int pid = create_ps(PAGE_SIZE*3, PAGE_SIZE*2, PAGE_SIZE*2, PAGE_SIZE*6, code_ro_data);
     print_procs(0);
     return 0;
 }
@@ -169,6 +174,11 @@ int find_free_page() {
     return -1;
 }
 
+void free_page(int page_num) {
+    char* free_list = (char*) (&OS_MEM[0]);
+    free_list[page_num - NUM_OS_FRAMES] = '1';
+}
+
 /*
  *  Each page table entry is a 32 bit unsigned integer
  *  Total page addresses = 128 MB / 4 KB= 2^15 pages
@@ -181,15 +191,15 @@ void init_page_table(struct PCB* pcb) {
             page_table[i] = 0x00000000;
             continue; // Heap pages are not allocated
         }
-        int add = find_free_page();
+        int addr = find_free_page();
         if (i < pcb->ro_data_start_add) { // Code data (only read and execute)
-            page_table[i] = (add <<16) | O_READ | O_EX | PG_PRESENT;
+            page_table[i] = (addr << 16) | O_READ | O_EX | PG_PRESENT;
         } else if (i < pcb->rw_data_start_add) { // Read only data
-            page_table[i] = (add <<16) | O_READ | PG_PRESENT;
+            page_table[i] = (addr << 16) | O_READ | PG_PRESENT;
         } else if (i < pcb->stack_start_add) { // Read write data
-            page_table[i] = (add <<16) | O_READ | O_WRITE | PG_PRESENT;
+            page_table[i] = (addr << 16) | O_READ | O_WRITE | PG_PRESENT;
         } else { // stack data (read and write)
-            page_table[i] = (add <<16) | O_READ | O_WRITE | PG_PRESENT;
+            page_table[i] = (addr << 16) | O_READ | O_WRITE | PG_PRESENT;
         }
     }
 }
@@ -231,6 +241,14 @@ int create_ps(int code_size, int ro_data_size, int rw_data_size, int max_stack_s
  */
 void exit_ps(int pid) {
     struct PCB* pcb = find_process(pid);
+    // Set pages as free
+    for (int i = 0; i < PS_VM_PAGES; i++) {
+        if (is_present(pcb->page_table[i])) {
+            int frame_num = pte_to_frame_num(pcb->page_table[i]);
+            free_page(frame_num);
+            pcb->page_table[i] = 0;
+        }
+    }
     pcb->pid = -1;
 }
 
@@ -243,6 +261,29 @@ int fork_ps(int pid) {
     int* proc_counter = (int*) (&OS_MEM[PROC_COUNTER]);
     int pid_new = (*proc_counter)++;
     pcb_new->pid = pid_new;
+
+    pcb_new->code_start_add = pcb->code_start_add;
+    pcb_new->ro_data_start_add = pcb->code_start_add;
+    pcb_new->rw_data_start_add = pcb->code_start_add;
+    pcb_new->heap_start_add = pcb->code_start_add;
+    pcb_new->stack_start_add = pcb->code_start_add;
+
+    init_page_table(pcb_new);
+
+    // Copy code from old process
+    for (int i = 0; i < PS_VM_PAGES; i++) {
+        page_table_entry pte = pcb->page_table[i];
+        page_table_entry pte_new = pcb_new->page_table[i];
+        if (is_present(pte)){
+            int frame_num = pte_to_frame_num(pte);
+            int frame_num_new = pte_to_frame_num(pte_new);
+            int start_add = frame_num * PAGE_SIZE;
+            int start_add_new = frame_num_new * PAGE_SIZE;
+            for (int j = 0; j < PAGE_SIZE; j++) {
+                RAM[start_add_new + j] = RAM[start_add + j];
+            }
+        }
+    }
     return pid_new;
 }
 
@@ -258,9 +299,19 @@ int fork_ps(int pid) {
 //
 // If any of the pages was already allocated then kill the process, deallocate all its resources(ps_exit) 
 // and set error_no to ERR_SEG_FAULT.
-void allocate_pages(int pid, int vmem_addr, int num_pages, int flags) 
-{
-   // TODO student
+void allocate_pages(int pid, int vmem_addr, int num_pages, int flags) {
+    struct PCB* pcb = find_process(pid);
+    int start_page = vmem_addr / PAGE_SIZE;
+    int end_page = start_page + num_pages;
+    for (int i = start_page; i < end_page; i++) {
+        if (is_present(pcb->page_table[i])) {
+            exit_ps(pid);
+            error_no = ERR_SEG_FAULT;
+            return;
+        }
+        int addr = find_free_page();
+        pcb->page_table[i] = (addr << 16) | flags | PG_PRESENT;
+    }
 }
 
 
@@ -273,9 +324,22 @@ void allocate_pages(int pid, int vmem_addr, int num_pages, int flags)
 
 // If any of the pages was not already allocated then kill the process, deallocate all its resources(ps_exit) 
 // and set error_no to ERR_SEG_FAULT.
-void deallocate_pages(int pid, int vmem_addr, int num_pages) 
-{
-   // TODO student
+void deallocate_pages(int pid, int vmem_addr, int num_pages) {
+   struct PCB* pcb = find_process(pid);
+   int start_page = vmem_addr / PAGE_SIZE;
+   int end_page = start_page + num_pages;
+   for (int i = start_page; i < end_page; i++) {
+        if (!is_present(pcb->page_table[i])) {
+            exit_ps(pid);
+            error_no = ERR_SEG_FAULT;
+            return;
+        } else {
+            int frame_num = pte_to_frame_num(pcb->page_table[i]);
+            free_page(frame_num);
+            pcb->page_table[i] = 0;
+        }
+   }
+   
 }
 
 // Read the byte at `vmem_addr` virtual address of the process
@@ -283,10 +347,19 @@ void deallocate_pages(int pid, int vmem_addr, int num_pages)
 // and set error_no to ERR_SEG_FAULT.
 // 
 // assume 0 <= vmem_addr < PS_VIRTUAL_MEM_SIZE
-unsigned char read_mem(int pid, int vmem_addr) 
-{
-    // TODO: student
-    return 0;
+unsigned char read_mem(int pid, int vmem_addr) {
+    struct PCB* pcb = find_process(pid);
+    int vm_page_num = vmem_addr / PAGE_SIZE;
+    page_table_entry pte = pcb->page_table[vm_page_num];
+    if (!is_present(pte)) {
+        exit_ps(pid);
+        error_no = ERR_SEG_FAULT;
+        return 0;
+    } else {
+        int frame_num = pte_to_frame_num(pte);
+        int start_add = frame_num * PAGE_SIZE;
+        return RAM[start_add + vmem_addr % PAGE_SIZE];
+    }
 }
 
 // Write the given `byte` at `vmem_addr` virtual address of the process
@@ -294,9 +367,18 @@ unsigned char read_mem(int pid, int vmem_addr)
 // and set error_no to ERR_SEG_FAULT.
 // 
 // assume 0 <= vmem_addr < PS_VIRTUAL_MEM_SIZE
-void write_mem(int pid, int vmem_addr, unsigned char byte) 
-{
-    // TODO: student
+void write_mem(int pid, int vmem_addr, unsigned char byte) {
+    struct PCB* pcb = find_process(pid);
+    int vm_page_num = vmem_addr / PAGE_SIZE;
+    page_table_entry pte = pcb->page_table[vm_page_num];
+    if (!is_present(pte) || !is_writeable(pte)) {
+        exit_ps(pid);
+        error_no = ERR_SEG_FAULT;
+    } else {
+        int frame_num = pte_to_frame_num(pte);
+        int start_add = frame_num * PAGE_SIZE;
+        RAM[start_add + vmem_addr % PAGE_SIZE] = byte;
+    }
 }
 
 
