@@ -26,13 +26,13 @@ int NUM_FRAMES = ((RAM_SIZE) / PAGE_SIZE); // 50 KB
 // Actual number of usable frames by the processes.
 int NUM_USABLE_FRAMES = ((RAM_SIZE - OS_MEM_SIZE) / PAGE_SIZE); // 32 KB
 
-const int NUM_OS_FRAMES = (OS_MEM_SIZE / PAGE_SIZE);
-const int PCB_SIZE = sizeof(struct PCB);
-const int PS_VM_PAGES = (PS_VIRTUAL_MEM_SIZE / PAGE_SIZE); 
-const int PAGE_TABLE_SIZE = PS_VM_PAGES * PAGE_TABLE_ENTRY_SIZE; // 4 KB
-const int PCB_PAGE_SIZE = PCB_SIZE + PAGE_TABLE_SIZE;
-const int PCB_START = ((RAM_SIZE - OS_MEM_SIZE) / PAGE_SIZE) * FREE_BIT_SIZE + 1024; // address 33 KB
-const int PROC_COUNTER = PCB_START + PCB_PAGE_SIZE * MAX_PROCS + 1024;
+#define NUM_OS_FRAMES (OS_MEM_SIZE / PAGE_SIZE)
+#define PCB_SIZE sizeof(struct PCB)
+#define PS_VM_PAGES (PS_VIRTUAL_MEM_SIZE / PAGE_SIZE) 
+#define PAGE_TABLE_SIZE (PS_VM_PAGES * PAGE_TABLE_ENTRY_SIZE) // 4 KB
+#define PCB_PAGE_SIZE (PCB_SIZE + PAGE_TABLE_SIZE)
+#define PCB_START (((RAM_SIZE - OS_MEM_SIZE) / PAGE_SIZE) * FREE_BIT_SIZE) + 1024 // address 33 KB
+#define PROC_COUNTER PCB_START + (PCB_PAGE_SIZE * MAX_PROCS) + 1024
 
 /*
  *  OS Memory Layout: 
@@ -158,11 +158,8 @@ void print_procs(int pid){
 #define MB (1024 * 1024)
 #define KB (1024)
 
-
-
 // just a random array to be passed to ps_create
 unsigned char code_ro_data[10 * MB];
-
 
 // Tester code begins
 int main() {
