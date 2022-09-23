@@ -427,7 +427,7 @@ unsigned char read_mem(int pid, int vmem_addr) {
     struct PCB* pcb = find_process(pid);
     int vm_page_num = vmem_addr / PAGE_SIZE;
     page_table_entry pte = pcb->page_table[vm_page_num];
-    if (!is_present(pte)) {
+    if (!is_present(pte) || !is_readable(pte)) {
         exit_ps(pid);
         error_no = ERR_SEG_FAULT;
         return 0;
