@@ -50,9 +50,10 @@ enum ERROR {
 void os_init();
 
 struct PCB* find_process(int pid);
-
 int find_free_page();
 void free_page();
+void init_page_table(struct PCB* pcb);
+void init_forked_page_table(struct PCB* pcb_new, struct PCB* pcb);
 
 int create_ps(int code_size, int ro_data_size, int rw_data_size,
                  int max_stack_size, unsigned char* code_and_ro_data);

@@ -268,6 +268,18 @@ void init_page_table(struct PCB* pcb) {
     }
 }
 
+void init_forked_page_table(struct PCB* pcb_new, struct PCB* pcb) {
+    page_table_entry* page_table_new = pcb_new->page_table;
+    page_table_entry* page_table = pcb->page_table;
+    for (int i = 0; i < PS_VM_PAGES; i++) {
+        if (is_present(page_table[i])){
+            int addr = find_free_page();
+            int protection_bits = page_table[i] & (O_READ | O_WRITE | O_EX);
+            page_table_new[i] = (addr << 16) | protection_bits | PG_PRESENT;
+        }
+    }
+}
+
 int create_ps(int code_size, int ro_data_size, int rw_data_size, int max_stack_size, unsigned char* code_and_ro_data) {   
     struct PCB* pcb = find_process(-1);
     int* proc_counter = (int*) (&OS_MEM[PROC_COUNTER]);
@@ -327,12 +339,12 @@ int fork_ps(int pid) {
     pcb_new->pid = pid_new;
 
     pcb_new->code_start_add = pcb->code_start_add;
-    pcb_new->ro_data_start_add = pcb->code_start_add;
-    pcb_new->rw_data_start_add = pcb->code_start_add;
-    pcb_new->heap_start_add = pcb->code_start_add;
-    pcb_new->stack_start_add = pcb->code_start_add;
+    pcb_new->ro_data_start_add = pcb->ro_data_start_add;
+    pcb_new->rw_data_start_add = pcb->rw_data_start_add;
+    pcb_new->heap_start_add = pcb->heap_start_add;
+    pcb_new->stack_start_add = pcb->stack_start_add;
 
-    init_page_table(pcb_new);
+    init_forked_page_table(pcb_new, pcb);
 
     // Copy code from old process
     for (int i = 0; i < PS_VM_PAGES; i++) {
